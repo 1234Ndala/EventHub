@@ -23,6 +23,18 @@ def creer_participant(participant: Participant):
     participants.append(nouveau_participant)
 
     return nouveau_participant
+@app.get("/participants/search/")
+def rechercher_participant(nom: str = None, email: str = None):
+    resultats = []
+
+    for participant in participants:
+        if nom and nom.lower() in participant["nom"].lower():
+            resultats.append(participant)
+
+        if email and email.lower() == participant["email"].lower():
+            resultats.append(participant)
+
+    return resultats
 @app.get("/participants/{participant_id}")
 def lire_participant(participant_id: int):
     for participant in participants:
