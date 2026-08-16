@@ -1,8 +1,20 @@
+import psycopg2
 from fastapi import FastAPI
 from pydantic import BaseModel
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 app = FastAPI()
+conn = psycopg2.connect(
+    host=os.getenv("DB_HOST"),
+    database=os.getenv("DB_NAME"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD")
+)
 
+cursor = conn.cursor()
 class Participant(BaseModel):
     nom: str
     email: str
@@ -17,12 +29,25 @@ def lire_participants():
 
 @app.post("/participants")
 def creer_participant(participant: Participant):
-    nouveau_participant = participant.model_dump()
-    nouveau_participant["id"] = len(participants) + 1
+    cursor.execute(
+        """
+        INSERT INTO participants (nom, email, telephone, type)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id;
+        """,
+        (participant.nom, participant.email, participant.telephone, participant.type)
+    )
 
-    participants.append(nouveau_participant)
+    nouvel_id = cursor.fetchone()[0]
+    conn.commit()
 
-    return nouveau_participant
+    return {
+        "id": nouvel_id,
+        "nom": participant.nom,
+        "email": participant.email,
+        "telephone": participant.telephone,
+        "type": participant.type
+    }
 @app.get("/participants/search/")
 def rechercher_participant(nom: str = None, email: str = None):
     resultats = []
