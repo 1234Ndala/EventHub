@@ -67,14 +67,34 @@ def creer_participant(participant: Participant):
     }
 @app.get("/participants/search/")
 def rechercher_participant(nom: str = None, email: str = None):
+
+    if nom:
+        cursor.execute(
+            "SELECT id, nom, email, telephone, type FROM participants WHERE nom ILIKE %s;",
+            (f"%{nom}%",)
+        )
+
+    elif email:
+        cursor.execute(
+            "SELECT id, nom, email, telephone, type FROM participants WHERE email = %s;",
+            (email,)
+        )
+
+    else:
+        return {"message": "Veuillez fournir un nom ou un email"}
+
+    lignes = cursor.fetchall()
+
     resultats = []
 
-    for participant in participants:
-        if nom and nom.lower() in participant["nom"].lower():
-            resultats.append(participant)
-
-        if email and email.lower() == participant["email"].lower():
-            resultats.append(participant)
+    for ligne in lignes:
+        resultats.append({
+            "id": ligne[0],
+            "nom": ligne[1],
+            "email": ligne[2],
+            "telephone": ligne[3],
+            "type": ligne[4]
+        })
 
     return resultats
 @app.get("/participants/{participant_id}")
