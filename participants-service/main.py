@@ -119,16 +119,38 @@ def lire_participant(participant_id: int):
 
 @app.put("/participants/{participant_id}")
 def modifier_participant(participant_id: int, participant: Participant):
-    for index, participant_existant in enumerate(participants):
-        if participant_existant["id"] == participant_id:
-            participant_modifie = participant.model_dump()
-            participant_modifie["id"] = participant_id
+    cursor.execute(
+        """
+        UPDATE participants
+        SET nom = %s, email = %s, telephone = %s, type = %s
+        WHERE id = %s
+        RETURNING id;
+        """,
+        (
+            participant.nom,
+            participant.email,
+            participant.telephone,
+            participant.type,
+            participant_id
+        )
+    )
 
-            participants[index] = participant_modifie
+    ligne = cursor.fetchone()
 
-            return participant_modifie
+    if ligne is None:
+        conn.rollback()
+        return {"message": "Participant non trouve"}
 
-    return {"message": "Participant non trouve"}
+    conn.commit()
+
+    return {
+        "id": participant_id,
+        "nom": participant.nom,
+        "email": participant.email,
+        "telephone": participant.telephone,
+        "type": participant.type
+    }
+
 @app.delete("/participants/{participant_id}")
 def supprimer_participant(participant_id: int):
     for index, participant in enumerate(participants):
