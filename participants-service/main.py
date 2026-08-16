@@ -15,6 +15,19 @@ conn = psycopg2.connect(
 )
 
 cursor = conn.cursor()
+
+@app.on_event("startup")
+def startup():
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS participants (
+            id SERIAL PRIMARY KEY,
+            nom VARCHAR(100) NOT NULL,
+            email VARCHAR(150) UNIQUE NOT NULL,
+            telephone VARCHAR(50),
+            type VARCHAR(100)
+        );
+    """)
+    conn.commit()
 class Participant(BaseModel):
     nom: str
     email: str
