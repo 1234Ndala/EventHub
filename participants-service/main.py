@@ -99,11 +99,24 @@ def rechercher_participant(nom: str = None, email: str = None):
     return resultats
 @app.get("/participants/{participant_id}")
 def lire_participant(participant_id: int):
-    for participant in participants:
-        if participant["id"] == participant_id:
-            return participant
+    cursor.execute(
+        "SELECT id, nom, email, telephone, type FROM participants WHERE id = %s;",
+        (participant_id,)
+    )
+
+    ligne = cursor.fetchone()
+
+    if ligne:
+        return {
+            "id": ligne[0],
+            "nom": ligne[1],
+            "email": ligne[2],
+            "telephone": ligne[3],
+            "type": ligne[4]
+        }
 
     return {"message": "Participant non trouve"}
+
 @app.put("/participants/{participant_id}")
 def modifier_participant(participant_id: int, participant: Participant):
     for index, participant_existant in enumerate(participants):
