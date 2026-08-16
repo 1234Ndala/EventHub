@@ -25,7 +25,24 @@ participants = []
 
 @app.get("/participants")
 def lire_participants():
-    return participants
+    cursor.execute(
+        "SELECT id, nom, email, telephone, type FROM participants;"
+    )
+
+    lignes = cursor.fetchall()
+
+    participants_db = []
+
+    for ligne in lignes:
+        participants_db.append({
+            "id": ligne[0],
+            "nom": ligne[1],
+            "email": ligne[2],
+            "telephone": ligne[3],
+            "type": ligne[4]
+        })
+
+    return participants_db
 
 @app.post("/participants")
 def creer_participant(participant: Participant):
