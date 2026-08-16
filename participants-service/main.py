@@ -153,9 +153,27 @@ def modifier_participant(participant_id: int, participant: Participant):
 
 @app.delete("/participants/{participant_id}")
 def supprimer_participant(participant_id: int):
-    for index, participant in enumerate(participants):
-        if participant["id"] == participant_id:
-            participant_supprime = participants.pop(index)
-            return participant_supprime
+    cursor.execute(
+        """
+        DELETE FROM participants
+        WHERE id = %s
+        RETURNING id, nom, email, telephone, type;
+        """,
+        (participant_id,)
+    )
 
-    return {"message": "Participant non trouve"}
+    ligne = cursor.fetchone()
+
+    if ligne is None:
+        conn.rollback()
+        return {"message": "Participant non trouve"}
+
+    conn.commit()
+
+    return {
+        "id": ligne[0],
+        "nom": ligne[1],
+        "email": ligne[2],
+        "telephone": ligne[3],
+        "type": ligne[4]
+    }
