@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import psycopg2
@@ -6,7 +7,13 @@ import os
 
 app = FastAPI(title="Events Service")
 
-# Connexion à PostgreSQL
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 def get_db():
     conn = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
@@ -17,7 +24,6 @@ def get_db():
     )
     return conn
 
-# Créer la table au démarrage
 @app.on_event("startup")
 def startup():
     conn = get_db()
@@ -37,7 +43,6 @@ def startup():
     cursor.close()
     conn.close()
 
-# Modèles
 class Event(BaseModel):
     titre: str
     description: str
@@ -52,7 +57,6 @@ class EventUpdate(BaseModel):
     lieu: Optional[str] = None
     capacite_max: Optional[int] = None
 
-# Créer un événement
 @app.post("/events")
 def creer_event(event: Event):
     conn = get_db()
@@ -65,12 +69,8 @@ def creer_event(event: Event):
     conn.commit()
     cursor.close()
     conn.close()
-    return {
-        "id": row[0], "titre": row[1], "description": row[2],
-        "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]
-    }
+    return {"id": row[0], "titre": row[1], "description": row[2], "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
 
-# Lister tous les événements avec filtres
 @app.get("/events")
 def lister_events(date: Optional[str] = None, lieu: Optional[str] = None):
     conn = get_db()
@@ -87,13 +87,8 @@ def lister_events(date: Optional[str] = None, lieu: Optional[str] = None):
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return [
-        {"id": r[0], "titre": r[1], "description": r[2],
-         "date": r[3], "lieu": r[4], "capacite_max": r[5], "inscrits": r[6]}
-        for r in rows
-    ]
+    return [{"id": r[0], "titre": r[1], "description": r[2], "date": r[3], "lieu": r[4], "capacite_max": r[5], "inscrits": r[6]} for r in rows]
 
-# Récupérer un événement par ID
 @app.get("/events/{id}")
 def get_event(id: int):
     conn = get_db()
@@ -104,10 +99,8 @@ def get_event(id: int):
     conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="Événement non trouvé")
-    return {"id": row[0], "titre": row[1], "description": row[2],
-            "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
+    return {"id": row[0], "titre": row[1], "description": row[2], "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
 
-# Modifier un événement
 @app.put("/events/{id}")
 def modifier_event(id: int, update: EventUpdate):
     conn = get_db()
@@ -131,10 +124,8 @@ def modifier_event(id: int, update: EventUpdate):
     conn.commit()
     cursor.close()
     conn.close()
-    return {"id": row[0], "titre": row[1], "description": row[2],
-            "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
+    return {"id": row[0], "titre": row[1], "description": row[2], "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
 
-# Supprimer un événement
 @app.delete("/events/{id}")
 def supprimer_event(id: int):
     conn = get_db()
@@ -148,7 +139,6 @@ def supprimer_event(id: int):
         raise HTTPException(status_code=404, detail="Événement non trouvé")
     return {"message": "Événement supprimé"}
 
-# Vérifier les places restantes
 @app.get("/events/{id}/disponibilite")
 def disponibilite(id: int):
     conn = get_db()
@@ -160,10 +150,4 @@ def disponibilite(id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Événement non trouvé")
     places_restantes = row[0] - row[1]
-    return {
-        "event_id": id,
-        "capacite_max": row[0],
-        "inscrits": row[1],
-        "places_restantes": places_restantes,
-        "disponible": places_restantes > 0
-    }
+    return {"event_id": id, "capacite_max": row[0], "inscrits": row[1], "places_restantes": places_restantes, "disponible": places_restantes > 0}
