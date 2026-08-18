@@ -22,7 +22,6 @@ conn = psycopg2.connect(
     user=os.getenv("DB_USER"),
     password=os.getenv("DB_PASSWORD")
 )
-
 cursor = conn.cursor()
 
 @app.on_event("startup")
@@ -44,29 +43,16 @@ class Participant(BaseModel):
     telephone: str
     type: str
 
-participants = []
-
 @app.get("/participants")
 def lire_participants():
     cursor.execute("SELECT id, nom, email, telephone, type FROM participants;")
     lignes = cursor.fetchall()
-    participants_db = []
-    for ligne in lignes:
-        participants_db.append({
-            "id": ligne[0],
-            "nom": ligne[1],
-            "email": ligne[2],
-            "telephone": ligne[3],
-            "type": ligne[4]
-        })
-    return participants_db
+    return [{"id": l[0], "nom": l[1], "email": l[2], "telephone": l[3], "type": l[4]} for l in lignes]
 
 @app.post("/participants")
 def creer_participant(participant: Participant):
-    cursor.execute(
-        "INSERT INTO participants (nom, email, telephone, type) VALUES (%s, %s, %s, %s) RETURNING id;",
-        (participant.nom, participant.email, participant.telephone, participant.type)
-    )
+    cursor.execute("INSERT INTO participants (nom, email, telephone, type) VALUES (%s, %s, %s, %s) RETURNING id;",
+        (participant.nom, participant.email, participant.telephone, participant.type))
     nouvel_id = cursor.fetchone()[0]
     conn.commit()
     return {"id": nouvel_id, "nom": participant.nom, "email": participant.email, "telephone": participant.telephone, "type": participant.type}
@@ -80,10 +66,7 @@ def rechercher_participant(nom: str = None, email: str = None):
     else:
         return {"message": "Veuillez fournir un nom ou un email"}
     lignes = cursor.fetchall()
-    resultats = []
-    for ligne in lignes:
-        resultats.append({"id": ligne[0], "nom": ligne[1], "email": ligne[2], "telephone": ligne[3], "type": ligne[4]})
-    return resultats
+    return [{"id": l[0], "nom": l[1], "email": l[2], "telephone": l[3], "type": l[4]} for l in lignes]
 
 @app.get("/participants/{participant_id}")
 def lire_participant(participant_id: int):
@@ -95,10 +78,8 @@ def lire_participant(participant_id: int):
 
 @app.put("/participants/{participant_id}")
 def modifier_participant(participant_id: int, participant: Participant):
-    cursor.execute(
-        "UPDATE participants SET nom = %s, email = %s, telephone = %s, type = %s WHERE id = %s RETURNING id;",
-        (participant.nom, participant.email, participant.telephone, participant.type, participant_id)
-    )
+    cursor.execute("UPDATE participants SET nom = %s, email = %s, telephone = %s, type = %s WHERE id = %s RETURNING id;",
+        (participant.nom, participant.email, participant.telephone, participant.type, participant_id))
     ligne = cursor.fetchone()
     if ligne is None:
         conn.rollback()
