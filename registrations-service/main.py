@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 import psycopg2
 import requests
 import os
@@ -55,7 +56,13 @@ class Registration(BaseModel):
     participant_id: int
 
 def to_dict(row):
-    return {"id": row[0], "event_id": row[1], "participant_id": row[2], "date_inscription": row[3].isoformat() if row[3] else None, "statut": row[4]}
+    return {
+        "id": row[0],
+        "event_id": row[1],
+        "participant_id": row[2],
+        "date_inscription": row[3].isoformat() if row[3] else None,
+        "statut": row[4],
+    }
 
 def compter_inscriptions_confirmees(event_id: int) -> int:
     conn = get_db()
@@ -79,9 +86,10 @@ def verifier_event_disponible(event_id: int):
     capacite_max = event["capacite_max"]
     inscrits = compter_inscriptions_confirmees(event_id)
     places_restantes = capacite_max - inscrits
-    if places_restantes <= 0:
-        raise HTTPException(status_code=409, detail="Plus de places disponibles")
-    return event
+    data = {"event_id": event_id, "capacite_max": capacite_max, "inscrits": inscrits, "places_restantes": places_restantes, "disponible": places_restantes > 0}
+    if not data["disponible"]:
+        raise HTTPException(status_code=409, detail="Plus de places disponibles pour cet événement")
+    return data
 
 def verifier_participant_existe(participant_id: int):
     try:
@@ -90,6 +98,8 @@ def verifier_participant_existe(participant_id: int):
         raise HTTPException(status_code=503, detail="participants-service injoignable")
     if resp.status_code == 404 or (resp.status_code == 200 and resp.json().get("message") == "Participant non trouve"):
         raise HTTPException(status_code=404, detail="Participant introuvable")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Erreur participants-service")
     return resp.json()
 
 @app.post("/registrations")
@@ -108,7 +118,7 @@ def inscrire(registration: Registration):
         conn.commit()
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
-        raise HTTPException(status_code=409, detail="Ce participant est déjà inscrit")
+        raise HTTPException(status_code=409, detail="Ce participant est déjà inscrit à cet événement")
     finally:
         cursor.close()
         conn.close()
