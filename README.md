@@ -222,11 +222,11 @@ feature/*     ← développement par service
 
 | Membre | Rôle |
 |---|---|
-| William M.B. Ndala | Scrum Master · events-service · CI/CD · Frontend (tableau de bord, export CSV, impression, icônes, recherche) |
+| William M.B. Ndala | Scrum Master · events-service · Frontend (tableau de bord, export CSV, impression, icônes, recherche) |
 | LOURE Zakaria | participants-service |
 | Mouhamed Diop | registrations-service |
 | Boris Kateta Upemba | Frontend React — structure des pages, connexion aux APIs |
-| OGANDAGA Shawn Marvin | Docker Compose · Rapport |
+| OGANDAGA Shawn Marvin | Docker Compose · GitHub Actions · Rapport |
 
 ---
 
