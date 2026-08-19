@@ -1,1 +1,102 @@
+version: "3.9"
 
+services:
+  db:
+    image: postgres:15
+    container_name: eventhub-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: eventsdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eventhub-net
+
+  events-service:
+    build: ./events-service
+    container_name: eventhub-events
+    environment:
+      DB_HOST: db
+      DB_NAME: eventsdb
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_PORT: "5432"
+    ports:
+      - "8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - eventhub-net
+
+  participants-service:
+    build: ./participants-service
+    container_name: eventhub-participants
+    environment:
+      DB_HOST: db
+      DB_NAME: eventsdb
+      DB_USER: postgres
+      DB_PASSWORD: password
+    ports:
+      - "8002:8002"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - eventhub-net
+
+  registrations-service:
+    build: ./registrations-service
+    container_name: eventhub-registrations
+    environment:
+      DB_HOST: db
+      DB_NAME: registrationsdb
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_PORT: "5432"
+      EVENTS_SERVICE_URL: http://events-service:8001
+      PARTICIPANTS_SERVICE_URL: http://participants-service:8002
+    ports:
+      - "8003:8002"
+    depends_on:
+      db:
+        condition: service_healthy
+      events-service:
+        condition: service_started
+      participants-service:
+        condition: service_started
+    restart: on-failure
+    networks:
+      - eventhub-net
+
+  frontend:
+    build: ./frontend
+    container_name: eventhub-frontend
+    environment:
+      HOST: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - events-service
+      - participants-service
+      - registrations-service
+    networks:
+      - eventhub-net
+
+volumes:
+  pgdata:
+
+networks:
+  eventhub-net:
+    driver: bridge
