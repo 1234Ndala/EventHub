@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - GITHUB
   pull_request:
     branches:
       - main
+      - GITHUB
 
 jobs:
   docker-compose:
