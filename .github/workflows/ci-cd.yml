@@ -97,12 +97,14 @@ jobs:
 
       - name: 📤 Build & Push
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/eventhub-events:latest ./events-service
-          docker push ${{ secrets.DOCKER_USERNAME }}/eventhub-events:latest
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/eventhub-participants:latest ./participants-service
-          docker push ${{ secrets.DOCKER_USERNAME }}/eventhub-participants:latest
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/eventhub-registrations:latest ./registrations-service
-          docker push ${{ secrets.DOCKER_USERNAME }}/eventhub-registrations:latest
+          docker build -t shakrem/eventhub-events:latest ./events-service
+          docker push shakrem/eventhub-events:latest
+
+          docker build -t shakrem/eventhub-participants:latest ./participants-service
+          docker push shakrem/eventhub-participants:latest
+
+          docker build -t shakrem/eventhub-registrations:latest ./registrations-service
+          docker push shakrem/eventhub-registrations:latest
 
   # ==================== DEPLOY ====================
   deploy:
