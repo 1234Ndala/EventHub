@@ -15,6 +15,31 @@ jobs:
     strategy:
       matrix:
         service: [events-service, participants-service, registrations-service]
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: eventsdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_NAME: eventsdb
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_PORT: 5432
+      EVENTS_SERVICE_URL: http://localhost:8001
+      PARTICIPANTS_SERVICE_URL: http://localhost:8002
+
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v3
@@ -28,7 +53,12 @@ jobs:
         working-directory: ./${{ matrix.service }}
         run: |
           pip install -r requirements.txt
-          pip install pytest httpx
+          pip install pytest httpx python-dotenv
+
+      - name: 🗄️ Create registrationsdb
+        if: matrix.service == 'registrations-service'
+        run: |
+          PGPASSWORD=password psql -h localhost -U postgres -c "CREATE DATABASE registrationsdb;"
 
       - name: 🧪 Tests
         working-directory: ./${{ matrix.service }}
