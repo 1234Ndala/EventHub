@@ -1,5 +1,25 @@
 from fastapi.testclient import TestClient
-from main import app
+from main import app, get_db
+
+def creer_table():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id SERIAL PRIMARY KEY,
+            titre VARCHAR(255) NOT NULL,
+            description TEXT,
+            date VARCHAR(50),
+            lieu VARCHAR(255),
+            capacite_max INTEGER,
+            inscrits INTEGER DEFAULT 0
+        )
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+creer_table()
 
 client = TestClient(app)
 
