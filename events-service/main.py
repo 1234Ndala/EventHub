@@ -1,7 +1,31 @@
-from fastapi.testclient import TestClient
-from main import app, get_db
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+import psycopg2
+import os
 
-def creer_table():
+app = FastAPI(title="Events Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+def get_db():
+    conn = psycopg2.connect(
+        host=os.getenv("DB_HOST", "localhost"),
+        database=os.getenv("DB_NAME", "eventsdb"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", "password"),
+        port=os.getenv("DB_PORT", "5432")
+    )
+    return conn
+
+@app.on_event("startup")
+def startup():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
@@ -19,30 +43,111 @@ def creer_table():
     cursor.close()
     conn.close()
 
-creer_table()
+class Event(BaseModel):
+    titre: str
+    description: str
+    date: str
+    lieu: str
+    capacite_max: int
 
-client = TestClient(app)
+class EventUpdate(BaseModel):
+    titre: Optional[str] = None
+    description: Optional[str] = None
+    date: Optional[str] = None
+    lieu: Optional[str] = None
+    capacite_max: Optional[int] = None
 
-def test_creer_event():
-    response = client.post("/events", json={
-        "titre": "Test événement",
-        "description": "Description test",
-        "date": "2026-09-15",
-        "lieu": "Amphi A",
-        "capacite_max": 50
-    })
-    assert response.status_code == 200
-    assert response.json()["titre"] == "Test événement"
+@app.post("/events")
+def creer_event(event: Event):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO events (titre, description, date, lieu, capacite_max)
+        VALUES (%s, %s, %s, %s, %s) RETURNING *
+    """, (event.titre, event.description, event.date, event.lieu, event.capacite_max))
+    row = cursor.fetchone()
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"id": row[0], "titre": row[1], "description": row[2], "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
 
-def test_lister_events():
-    response = client.get("/events")
-    assert response.status_code == 200
-    assert isinstance(response.json(), list)
+@app.get("/events")
+def lister_events(date: Optional[str] = None, lieu: Optional[str] = None):
+    conn = get_db()
+    cursor = conn.cursor()
+    query = "SELECT * FROM events WHERE 1=1"
+    params = []
+    if date:
+        query += " AND date = %s"
+        params.append(date)
+    if lieu:
+        query += " AND LOWER(lieu) = LOWER(%s)"
+        params.append(lieu)
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return [{"id": r[0], "titre": r[1], "description": r[2], "date": r[3], "lieu": r[4], "capacite_max": r[5], "inscrits": r[6]} for r in rows]
 
-def test_get_event_inexistant():
-    response = client.get("/events/9999")
-    assert response.status_code == 404
+@app.get("/events/{id}")
+def get_event(id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM events WHERE id = %s", (id,))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Événement non trouvé")
+    return {"id": row[0], "titre": row[1], "description": row[2], "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
 
-def test_supprimer_event_inexistant():
-    response = client.delete("/events/9999")
-    assert response.status_code == 404
+@app.put("/events/{id}")
+def modifier_event(id: int, update: EventUpdate):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM events WHERE id = %s", (id,))
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        conn.close()
+        raise HTTPException(status_code=404, detail="Événement non trouvé")
+    cursor.execute("""
+        UPDATE events SET
+            titre = COALESCE(%s, titre),
+            description = COALESCE(%s, description),
+            date = COALESCE(%s, date),
+            lieu = COALESCE(%s, lieu),
+            capacite_max = COALESCE(%s, capacite_max)
+        WHERE id = %s RETURNING *
+    """, (update.titre, update.description, update.date, update.lieu, update.capacite_max, id))
+    row = cursor.fetchone()
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"id": row[0], "titre": row[1], "description": row[2], "date": row[3], "lieu": row[4], "capacite_max": row[5], "inscrits": row[6]}
+
+@app.delete("/events/{id}")
+def supprimer_event(id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM events WHERE id = %s RETURNING id", (id,))
+    row = cursor.fetchone()
+    conn.commit()
+    cursor.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Événement non trouvé")
+    return {"message": "Événement supprimé"}
+
+@app.get("/events/{id}/disponibilite")
+def disponibilite(id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT capacite_max, inscrits FROM events WHERE id = %s", (id,))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Événement non trouvé")
+    places_restantes = row[0] - row[1]
+    return {"event_id": id, "capacite_max": row[0], "inscrits": row[1], "places_restantes": places_restantes, "disponible": places_restantes > 0}
