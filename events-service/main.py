@@ -24,24 +24,24 @@ def get_db():
     )
     return conn
 
-@app.on_event("startup")
-def startup():
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS events (
-            id SERIAL PRIMARY KEY,
-            titre VARCHAR(255) NOT NULL,
-            description TEXT,
-            date VARCHAR(50),
-            lieu VARCHAR(255),
-            capacite_max INTEGER,
-            inscrits INTEGER DEFAULT 0
-        )
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
+# ✅ Création de la table à l'import (fonctionne avec TestClient en CI)
+_conn = get_db()
+_cursor = _conn.cursor()
+_cursor.execute("""
+    CREATE TABLE IF NOT EXISTS events (
+        id SERIAL PRIMARY KEY,
+        titre VARCHAR(255) NOT NULL,
+        description TEXT,
+        date VARCHAR(50),
+        lieu VARCHAR(255),
+        capacite_max INTEGER,
+        inscrits INTEGER DEFAULT 0
+    )
+""")
+_conn.commit()
+_cursor.close()
+_conn.close()
+
 
 class Event(BaseModel):
     titre: str
